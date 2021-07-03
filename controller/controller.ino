@@ -7,6 +7,7 @@
 // Code for Arduino Nano
 #include <LCD16x2.h>
 #include <Wire.h>
+#include <SPI.h>
 
 #define button1 0x01
 #define button2 0x02
@@ -44,7 +45,7 @@ void setup() {
 
   // Attach the interrupt at D2, D3 is also available for interrupts
   // This is for the wheel counter, for calculating speed and distance
-  attachInterrupt(digitalPinToInterrupt(2), count, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(2), count, RISING);
   Wire.begin();
 
   // Reset LCD and print information
