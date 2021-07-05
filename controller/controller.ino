@@ -84,10 +84,17 @@ void loop() {
 
 }
 
+/**
+ * Convenience function
+ * Check the status of the buttons on the LCD.
+ */
 bool button_pressed(uint8_t buttons, uint8_t button) {
   return !(buttons & button);
 }
 
+/**
+ * Reset the LCD to the start-up behaviour
+ */
 void reset_lcd(LCD16x2 lcd){
   lcd.lcdClear();
 
@@ -98,13 +105,16 @@ void reset_lcd(LCD16x2 lcd){
   lcd.lcdWrite("Dist.:");
 }
 
+/**
+ * Increase the counter for the wheel sensor
+ */
 void count() {
   counter++;
 }
 
 /**
  * Send the distance counted to the screen, distance
- * is displayed in km with one decimal and unit with a comma as
+ * is displayed in km with one decimal and unit, with a comma as
  * the separator, minimally 5 characters displayed.
  */
 void display_distance(uint8_t x, uint8_t y, uint32_t dist_m, LCD16x2 lcd) {
@@ -147,8 +157,8 @@ uint8_t calculate_distance_hm(uint32_t dist_m) {
 }
 
 /**
- * Calculates the length of the integer to display, to calculate display
- * offsets.
+ * Calculates the length of the integer to display, 
+ * to calculate display offsets.
  */
 uint8_t get_int_len(int num) {
   int i = 0;
