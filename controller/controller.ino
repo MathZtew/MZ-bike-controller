@@ -23,11 +23,15 @@
 #define rot_slits 64
 // Diameter of wheel to measure in mm
 #define wheel_diam 700
+// Time period for the loop
+#define period 100
 
 // Counts the number of changes in the optical sensor
 // Because of the restrictions of the counter, a max
 // distance of about 35000 km is possible
 uint32_t counter = 20350;
+
+uint32_t last_time;
 
 #ifdef SCREEN
 // LCD object
@@ -61,6 +65,10 @@ void setup() {
  * Main program loop
  */
 void loop() {
+
+  last_time = millis();
+  uint32_t next_time = last_time + period;
+
   #ifdef SCREEN
   // Read buttons from screen
   uint8_t buttons = lcd.readButtons();
@@ -79,8 +87,10 @@ void loop() {
     reset_lcd(lcd);
   }
   #endif
+  
+  while (millis() <= next_time){
     
-  delay(100);
+  }
 
 }
 
@@ -138,8 +148,8 @@ void display_distance(uint8_t x, uint8_t y, uint32_t dist_m, LCD16x2 lcd) {
  */
 uint32_t calculate_distance_m(float circ) {
   float res = (float) counter / (float) rot_slits;
-  res = res * circ;
-  return (long) res;
+  res *= circ;
+  return (uint32_t) res;
 }
 
 /**
