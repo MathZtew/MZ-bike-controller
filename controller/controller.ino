@@ -1,7 +1,7 @@
 /**
  * Author: MathZtew
  * Licensed under MIT-license
- * TODO: Add license to project
+ * 2021-07
  */
 
 // Code for Arduino Nano
@@ -9,6 +9,11 @@
 #include <Wire.h>
 #include <SPI.h>
 
+// Controller functions, only stops execution data persists
+#define SCREEN
+#define WHEEL_SENSOR
+
+// Button shorthands
 #define button1 0x01
 #define button2 0x02
 #define button3 0x04
@@ -17,6 +22,7 @@
 // LCD object
 LCD16x2 lcd;
 
+// button status
 int buttons;
 
 // Counts the number of changes in the optical sensor
@@ -43,17 +49,25 @@ void setup() {
 
   Serial.begin(9600);
 
+  #ifdef WHEEL_SENSOR
   // Attach the interrupt at D2, D3 is also available for interrupts
   // This is for the wheel counter, for calculating speed and distance
   attachInterrupt(digitalPinToInterrupt(2), count, RISING);
+  #endif
+  
+  #ifdef SCREEN
+  // Start i2c
   Wire.begin();
-
   // Reset LCD and print information
   reset_lcd();
+  #endif
 }
 
 void loop() {
   // Main program loop
+
+  #ifdef SCREEN
+  // Read buttons from screen
   buttons = lcd.readButtons();
   
   // Print encoder wheel counter
@@ -69,6 +83,7 @@ void loop() {
     counter = 0;
     reset_lcd();
   }
+  #endif
     
   delay(100);
 
@@ -92,6 +107,11 @@ void count() {
   counter++;
 }
 
+/**
+ * Send the distance counted to the screen, distance
+ * is displayed in km with one decimal and unit with a comma as
+ * the separator, minimally 5 character displayed.
+ */
 void display_distance(int x, int y) {
   lcd.lcdGoToXY(x, y);
   x += get_int_len(dist_km);
