@@ -11,9 +11,9 @@
 #include "lcd.h"
 
 // Controller functions, only stops execution, data persists
-#define SCREEN
-#define WHEEL_SENSOR
-#define DIG_POT
+#define SCREEN // Screen output and speed calculations
+#define WHEEL_SENSOR // Sensor to count wheel rotations
+#define DIG_POT // Write values to the digital potentiometer
 
 // Button shorthands
 #define button1 0x01
@@ -25,6 +25,7 @@
 // Digital pot MCP41XXX
 #define CHIP_SELECT 10
 #define POT_WRITE_COMMAND 0x13
+#define SENSORPIN A0
 
 // Slits in the encoder wheel for the sensor
 #define rot_slits 64
@@ -33,7 +34,7 @@
 // Time period for the loop
 #define period 100
 
-// Counts the number of changes in the optical sensor
+// Counts the number of changes in the optical sensor.
 // Because of the restrictions of the counter, a max
 // distance of about 35000 km is possible
 uint32_t counter = 20350;
@@ -83,8 +84,11 @@ void setup() {
  * Main program loop
  */
 void loop() {
-  pot_value++;
+  #ifdef DIG_POT
+  // 10-bit value conversion to 8-bit
+  pot_value = analogRead(SENSORPIN) >> 2;
   write_pot(pot_value);
+  #endif
 
   #ifdef SCREEN
   // Change to a frequency, not just a delay
@@ -110,11 +114,10 @@ void loop() {
     lcdWrite("km/h");
     old_speed = speed;
   }
+  
   // If value has not changed, don't update screen
   if (counter != old_counter) {
-
     // Calculate the distance travelled and display it
-    
     display_distance(7, 2, dist_m);
     old_counter = counter;
   }

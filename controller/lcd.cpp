@@ -139,7 +139,6 @@ void lcdWrite(float floatVal, uint8_t precision){
 void lcdWrite(float floatVal, uint8_t precision, uint8_t size){
     char charBuf[10];
     dtostrf(floatVal, 3, precision, charBuf);
-    Serial.println(charBuf);
     bool next = false;
     for (int i = 0; i < size; i++) {
         if (!(charBuf[i] >= 0x2E && charBuf[i] <= 0x39) || next) {
@@ -148,6 +147,5 @@ void lcdWrite(float floatVal, uint8_t precision, uint8_t size){
         }
     }
     charBuf[size] = 0;
-    Serial.println(charBuf);
     lcdWrite(charBuf);
 }
