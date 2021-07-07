@@ -5,13 +5,15 @@
  */
 
 // Code for Arduino Nano
-#include <LCD16x2.h>
+//#include <LCD16x2.h>
 #include <Wire.h>
 #include <SPI.h>
+#include "lcd.h"
 
-// Controller functions, only stops execution - data persists
+// Controller functions, only stops execution, data persists
 #define SCREEN
 #define WHEEL_SENSOR
+#define DIG_POT
 
 // Button shorthands
 #define button1 0x01
@@ -19,10 +21,15 @@
 #define button3 0x04
 #define button4 0x08
 
+// SPI constants for digital potentiometer
+// Digital pot MCP41XXX
+#define CHIP_SELECT 10
+#define POT_WRITE_COMMAND 0x13
+
 // Slits in the encoder wheel for the sensor
 #define rot_slits 64
 // Diameter of wheel to measure in mm
-#define wheel_diam 700
+#define wheel_diam 70000
 // Time period for the loop
 #define period 100
 
@@ -30,12 +37,15 @@
 // Because of the restrictions of the counter, a max
 // distance of about 35000 km is possible
 uint32_t counter = 20350;
+uint32_t old_counter = counter + 1;
+float old_speed = 1;
 
-uint32_t last_time;
+#ifdef DIG_POT
+// The byte that is to be sent to the digital potentiometer
+uint8_t pot_value = 0;
+#endif
 
 #ifdef SCREEN
-// LCD object
-LCD16x2 lcd;
 // The circumference of the wheel
 const float circ = 3.14 * (float) wheel_diam / 1000;
 #endif
@@ -52,46 +62,71 @@ void setup() {
   // This is for the wheel counter, for calculating speed and distance
   attachInterrupt(digitalPinToInterrupt(2), count, RISING);
   #endif
-  
+
   #ifdef SCREEN
   // Start i2c
   Wire.begin();
   // Reset LCD and print information
-  reset_lcd(lcd);
+  reset_lcd();
   #endif
+
+  #ifdef DIG_POT
+  pinMode(CHIP_SELECT, OUTPUT);
+  digitalWrite(CHIP_SELECT, HIGH);
+  SPI.begin();
+  write_pot(pot_value);
+  #endif
+
 }
 
 /**
  * Main program loop
  */
 void loop() {
-
-  last_time = millis();
-  uint32_t next_time = last_time + period;
+  pot_value++;
+  write_pot(pot_value);
 
   #ifdef SCREEN
-  // Read buttons from screen
-  uint8_t buttons = lcd.readButtons();
-  
-  // Print encoder wheel counter
-  lcd.lcdGoToXY(7,1); 
-  lcd.lcdWrite(counter);
-
-  // Calculate the distance travelled and display it
+  // Change to a frequency, not just a delay
+  uint32_t end_time = millis() + period;
   uint32_t dist_m = calculate_distance_m(circ);
-  display_distance(7, 2, dist_m, lcd);
+  // Wait until next period
+  while (millis() <= end_time){
+  }
 
+  uint32_t new_dist_m = calculate_distance_m(circ);
+  float seconds = 1.0 / period;
+  float speed = (float) (new_dist_m - dist_m) / seconds;
+  dist_m = new_dist_m;
+
+  // Read buttons from screen
+  uint8_t buttons = readButtons();
+
+  if (old_speed != speed) {
+    // Print encoder wheel counter
+    lcdGoToXY(7,1);
+    lcdWrite(speed, 1, 7);
+    lcdGoToXY(13, 1);
+    lcdWrite("km/h");
+    old_speed = speed;
+  }
+  // If value has not changed, don't update screen
+  if (counter != old_counter) {
+
+    // Calculate the distance travelled and display it
+    
+    display_distance(7, 2, dist_m);
+    old_counter = counter;
+  }
+  
   // Clear distance travelled 
   if (button_pressed(buttons, button1)) {  
     counter = 0;
-    reset_lcd(lcd);
+    old_counter = ~counter;
+    old_speed = 0.1;
+    reset_lcd();
   }
   #endif
-  
-  while (millis() <= next_time){
-    
-  }
-
 }
 
 /**
@@ -105,14 +140,14 @@ bool button_pressed(uint8_t buttons, uint8_t button) {
 /**
  * Reset the LCD to the start-up behaviour
  */
-void reset_lcd(LCD16x2 lcd){
-  lcd.lcdClear();
+void reset_lcd(){
+  lcdClear();
 
-  lcd.lcdGoToXY(1,1);
-  lcd.lcdWrite("Slits:");
+  lcdGoToXY(1,1);
+  lcdWrite("Speed:");
 
-  lcd.lcdGoToXY(1,2);
-  lcd.lcdWrite("Dist.:");
+  lcdGoToXY(1,2);
+  lcdWrite("Dist.:");
 }
 
 /**
@@ -127,20 +162,14 @@ void count() {
  * is displayed in km with one decimal and unit, with a comma as
  * the separator, minimally 5 characters displayed.
  */
-void display_distance(uint8_t x, uint8_t y, uint32_t dist_m, LCD16x2 lcd) {
-  lcd.lcdGoToXY(x, y);
+void display_distance(uint8_t x, uint8_t y, uint32_t dist_m) {
+  lcdGoToXY(x, y);
   uint16_t dist_km = calculate_distance_km(dist_m);
-  x += get_int_len(dist_km);
-  lcd.lcdWrite(dist_km);
-  lcd.lcdGoToXY(x, y);
-  lcd.lcdWrite(",");
-  x += 1;
-  lcd.lcdGoToXY(x, y);
+  lcdWrite(dist_km);
+  lcdWrite(",");
   uint8_t dist_hm = calculate_distance_hm(dist_m);
-  lcd.lcdWrite(dist_hm);
-  x += get_int_len(dist_hm);
-  lcd.lcdGoToXY(x, y);
-  lcd.lcdWrite("km");
+  lcdWrite(dist_hm);
+  lcdWrite("km");
 }
 
 /**
@@ -167,8 +196,8 @@ uint8_t calculate_distance_hm(uint32_t dist_m) {
 }
 
 /**
- * Calculates the length of the integer to display, 
- * to calculate display offsets.
+ * Calculates the length of the integer, 
+ * used to calculate display offsets.
  */
 uint8_t get_int_len(int num) {
   int i = 0;
@@ -178,4 +207,17 @@ uint8_t get_int_len(int num) {
     copy = copy / 10;
   } while (copy != 0);
   return i;
+}
+
+/**
+ * Write a value to the digital potentiometer.
+ */
+void write_pot(uint8_t value) {
+  digitalWrite(CHIP_SELECT, LOW);
+  // 4 MHz clock, MSB first, mode 0
+  SPI.beginTransaction (SPISettings (4000000, MSBFIRST, SPI_MODE0));
+  SPI.transfer(POT_WRITE_COMMAND);
+  SPI.transfer(value);
+  SPI.endTransaction();
+  digitalWrite(CHIP_SELECT, HIGH);
 }
