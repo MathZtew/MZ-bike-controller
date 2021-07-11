@@ -148,6 +148,14 @@ void loop() {
     if (button_pressed(buttons, button2)){
       relay = !relay;
       digitalWrite(RELAY_PIN, relay);
+      if (relay) {
+        lcdGoToXY(16, 2);
+        lcdWrite("*");
+      }
+      else {
+        lcdGoToXY(16, 2);
+        lcdWrite(" ");
+      }
     }
   }
   else if (mode == POT_MODE) {
