@@ -21,11 +21,18 @@
 #define button3 0x04
 #define button4 0x08
 
+// Screen modes
+#define SPEED_MODE 0
+#define POT_MODE 1
+
 // SPI constants for digital potentiometer
 // Digital pot MCP41XXX
 #define CHIP_SELECT 10
 #define POT_WRITE_COMMAND 0x13
 #define SENSORPIN A0
+#define POT_CHANGE 3
+
+#define RELAY_PIN 5
 
 // Slits in the encoder wheel for the sensor
 #define rot_slits 64
@@ -41,6 +48,8 @@ uint32_t counter = 20350;
 uint32_t old_counter = counter + 1;
 float old_speed = 1;
 
+bool change = true;
+
 #ifdef DIG_POT
 // The byte that is to be sent to the digital potentiometer
 uint8_t pot_value = 0;
@@ -49,7 +58,10 @@ uint8_t pot_value = 0;
 #ifdef SCREEN
 // The circumference of the wheel
 const float circ = 3.14 * (float) wheel_diam / 1000;
+uint8_t mode = 0;
 #endif
+
+bool relay = false;
 
 /**
  * Runs on start-up
@@ -78,6 +90,9 @@ void setup() {
   write_pot(pot_value);
   #endif
 
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, relay);
+
 }
 
 /**
@@ -86,8 +101,9 @@ void setup() {
 void loop() {
   #ifdef DIG_POT
   // 10-bit value conversion to 8-bit
-  pot_value = analogRead(SENSORPIN) >> 2;
+  //pot_value = analogRead(SENSORPIN) >> 2;
   write_pot(pot_value);
+  change = false;
   #endif
 
   #ifdef SCREEN
@@ -105,31 +121,83 @@ void loop() {
 
   // Read buttons from screen
   uint8_t buttons = readButtons();
+  if (mode == SPEED_MODE) {
+    if (old_speed != speed) {
+      // Print encoder wheel counter
+      lcdGoToXY(7,1);
+      lcdWrite(speed, 1, 7);
+      lcdGoToXY(13, 1);
+      lcdWrite("km/h");
+      old_speed = speed;
+    }
+    
+    // If value has not changed, don't update screen
+    if (counter != old_counter) {
+      // Calculate the distance travelled and display it
+      display_distance(7, 2, dist_m);
+      old_counter = counter;
+    }
 
-  if (old_speed != speed) {
-    // Print encoder wheel counter
-    lcdGoToXY(7,1);
-    lcdWrite(speed, 1, 7);
-    lcdGoToXY(13, 1);
-    lcdWrite("km/h");
-    old_speed = speed;
+      // Clear distance travelled 
+    if (button_pressed(buttons, button1)) {  
+      counter = 0;
+      old_counter = ~counter;
+      old_speed = 0.1;
+      reset_lcd();
+    }
+    if (button_pressed(buttons, button2)){
+      relay = !relay;
+      digitalWrite(RELAY_PIN, relay);
+    }
+  }
+  else if (mode == POT_MODE) {
+    change = false;
+    if (button_pressed(buttons, button1)) {
+      pot_value = 0;
+      change = true;
+    }
+    if (button_pressed(buttons, button2)) {
+      pot_value = pot_value - POT_CHANGE < 0 ? 0 : pot_value - POT_CHANGE;
+      change = true;
+    }
+    if (button_pressed(buttons, button3)) {
+      pot_value = pot_value + POT_CHANGE > 255 ? 255 : pot_value + POT_CHANGE;
+      change = true;
+    }
+    if (change) {
+      lcdGoToXY(1,2);
+      lcdWrite(pot_value);
+      lcdWrite("  ");
+    }
   }
   
-  // If value has not changed, don't update screen
-  if (counter != old_counter) {
-    // Calculate the distance travelled and display it
-    display_distance(7, 2, dist_m);
-    old_counter = counter;
+  // change screen modes
+  if (button_pressed(buttons, button4)) {
+    mode = mode == 0 ? 1 : 0;
+    change_screen_mode(mode);
   }
-  
-  // Clear distance travelled 
-  if (button_pressed(buttons, button1)) {  
-    counter = 0;
+
+  #endif
+}
+
+/**
+ * Changes the screen behaviour to the correct mode.
+ */
+void change_screen_mode(uint8_t mode) {
+  switch (mode)
+  {
+  case SPEED_MODE:
     old_counter = ~counter;
     old_speed = 0.1;
     reset_lcd();
+    break;
+  case POT_MODE:
+    lcd_pot();
+    break;
+  
+  default:
+    break;
   }
-  #endif
 }
 
 /**
@@ -154,6 +222,20 @@ void reset_lcd(){
 }
 
 /**
+ * Resets the LCD to the potentiometer mode.
+ */
+void lcd_pot() {
+  lcdClear();
+
+  lcdGoToXY(1,1);
+  lcdWrite("pot value:");
+
+  lcdGoToXY(1,2);
+  lcdWrite(pot_value);
+  lcdWrite("  ");
+}
+
+/**
  * Increase the counter for the wheel sensor
  */
 void count() {
@@ -169,9 +251,10 @@ void display_distance(uint8_t x, uint8_t y, uint32_t dist_m) {
   lcdGoToXY(x, y);
   uint16_t dist_km = calculate_distance_km(dist_m);
   lcdWrite(dist_km);
-  lcdWrite(",");
+  lcdWrite(".");
   uint8_t dist_hm = calculate_distance_hm(dist_m);
   lcdWrite(dist_hm);
+  lcdGoToXY(13, y);
   lcdWrite("km");
 }
 
