@@ -7,7 +7,7 @@
 #define LCD_CLR     0x60
 #define LCD_WR      0x61
 
-#define LCD_WRITE_WAIT  15
+#define LCD_WRITE_WAIT  17
 
 void lcdSetBlacklight(uint8_t value);
 uint8_t readButtons();
