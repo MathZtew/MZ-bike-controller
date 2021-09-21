@@ -337,7 +337,7 @@ void write_battery_voltage(int x, int y, float voltage) {
 
 uint16_t get_battery_voltage() {
   uint16_t voltage = analogRead(SENSORPIN) >> 4;
-  return (voltage - 24)/4;//((float)50 / (float)256) * voltage;
+  return voltage;//((float)50 / (float)256) * voltage;
 }
 
 /**
